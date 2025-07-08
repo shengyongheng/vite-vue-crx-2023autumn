@@ -1,5 +1,12 @@
 <script setup>
-import { onMounted, ref } from 'vue';
+import { onMounted, reactive, ref } from 'vue';
+
+const OPERATE_TYPE = {
+    NAME: 'name',
+    ID: 'id',
+}
+
+const operateType = ref("")
 
 const input = ref('')
 const currentPage = ref(1)
@@ -8,8 +15,25 @@ const pageSize = ref(10)
 const size = ref('default')
 const background = ref(false)
 const disabled = ref(false)
+const editingIndex = ref("")
 
 const memberList = ref([])
+const ruleFormRef = ref()
+
+const ruleForm = reactive({
+    name: '',
+    id: '',
+})
+
+const addMemberForm = reactive({
+    name: '',
+    id: '',
+})
+
+const rules = reactive({
+    name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
+    id: [{ required: true, message: '请输入ID', trigger: 'blur' }],
+})
 
 onMounted(() => {
     fetch('https://tranquil-toffee-ab3d84.netlify.app/api/members')
@@ -19,6 +43,27 @@ onMounted(() => {
         })
         .catch(err => console.log('Request Failed', err));
 })
+
+const handleEditName = (id) => {
+    operateType.value = OPERATE_TYPE.NAME
+    editingIndex.value = id
+}
+
+const handleEditNameCancel = (id) => {
+    operateType.value = ""
+    editingIndex.value = ""
+}
+
+const handleEditNameSave = (id) => {
+    operateType.value = ""
+    editingIndex.value = ""
+    ruleForm.name = memberList.value.find(item => item.id === id).name
+}
+
+const handleEditId = (id) => {
+    operateType.value = OPERATE_TYPE.ID
+    editingIndexById.value = id
+}
 
 const handleSizeChange = (val) => {
     console.log(`${val} items per page`)
@@ -40,14 +85,76 @@ const handleCurrentChange = (val) => {
             <span class="selection-limit" style="display: none">最多只能选择 20 个成员</span>
         </div>
         <div class="search-box">
-            <el-input v-model="input" style="width: 240px" placeholder="搜索成员..." clearable />
+            <el-input v-model="input" style="width: 100%;height: 28px;" placeholder="搜索成员..." clearable />
+        </div>
+        <div class="add-member">
+            <el-form :inline="true" :model="addMemberForm" class="demo-form-inline">
+                <el-form-item label="id">
+                    <el-input v-model="addMemberForm.id" placeholder="请输入id" clearable />
+                </el-form-item>
+                <el-form-item label="name">
+                    <el-input v-model="addMemberForm.name" placeholder="请输入name" clearable />
+                </el-form-item>
+                <el-form-item>
+                    <el-button type="primary">添加</el-button>
+                </el-form-item>
+            </el-form>
         </div>
         <div class="member-container">
             <div class="member-list">
                 <div class="member-item" v-for="item in memberList" :key="item.id">
+                    <el-popconfirm title="确认要删除该成员吗？" placement="top">
+                        <template #reference>
+                            <el-icon class="delete-icon">
+                                <Delete />
+                            </el-icon>
+                        </template>
+                    </el-popconfirm>
                     <el-checkbox v-model="item.checked" />
-                    <span>{{ item.name }}</span>
-                    <span>({{ item.id }})</span>
+                    <div class="member-item-info">
+                        <el-form ref="ruleFormRef" :model="ruleForm" status-icon :rules="rules" label-width="auto">
+                            <div class="member-item-info-name">
+                                <template v-if="editingIndex === item.id && operateType === OPERATE_TYPE.NAME">
+                                    <el-form-item prop="name">
+                                        <el-input v-model="ruleForm.name" />
+                                    </el-form-item>
+                                    <div>
+                                        <el-icon @click="handleEditNameCancel(item.name)">
+                                            <Close />
+                                        </el-icon>
+                                        <el-icon @click="handleEditNameSave(item.id)">
+                                            <Check />
+                                        </el-icon>
+                                    </div>
+                                </template>
+                                <template v-else>
+                                    <span>{{ item.name }}</span>
+                                    <el-icon @click="handleEditName(item.id)">
+                                        <Edit />
+                                    </el-icon>
+                                </template>
+                            </div>
+                            <div class="member-item-info-id">
+                                <template v-if="editingIndex === item.id && operateType === OPERATE_TYPE.ID">
+                                    <el-form-item prop="id">
+                                        <el-input v-model="ruleForm.id" />
+                                    </el-form-item>
+                                    <el-icon @click="handleEditSave(item.id)">
+                                        <Close />
+                                    </el-icon>
+                                    <el-icon>
+                                        <Check />
+                                    </el-icon>
+                                </template>
+                                <template v-else>
+                                    <span>({{ item.id }})</span>
+                                    <el-icon @click="handleEdit(item.id)">
+                                        <Edit />
+                                    </el-icon>
+                                </template>
+                            </div>
+                        </el-form>
+                    </div>
                 </div>
             </div>
         </div>
@@ -100,6 +207,27 @@ const handleCurrentChange = (val) => {
         margin-bottom: 20px;
     }
 
+    .add-member {
+        margin-bottom: 12px;
+
+        :deep(.el-form) {
+            height:30px;
+        }
+
+        :deep(.el-form-item) {
+            margin-bottom: 16px !important;
+            margin-right: 8px !important;
+        }
+        :deep(.el-input) {
+            width: 116px;
+            height: 28px;
+        }
+        :deep(.el-button) {
+            height: 28px;
+            width: 40px;
+        }
+    }
+
     .member-container {
         background: #fff;
         border-radius: 4px;
@@ -112,9 +240,10 @@ const handleCurrentChange = (val) => {
             gap: 16px;
 
             .member-item {
+                position: relative;
                 display: flex;
                 align-items: center;
-                padding: 12px;
+                padding: 8px;
                 border-radius: 4px;
                 background: #F5F7FA;
                 transition: all 0.3s;
@@ -123,21 +252,51 @@ const handleCurrentChange = (val) => {
                     background: #EBEEF5;
                 }
 
+                &:hover .delete-icon {
+                    display: block;
+                }
+
                 :deep(.el-checkbox) {
                     margin-right: 12px;
                 }
 
-                span {
-                    color: #606266;
-                    
-                    &:first-of-type {
-                        margin-right: 8px;
-                        font-weight: 500;
-                    }
+                
+                .delete-icon {
+                        position: absolute;
+                        display: none;
+                        right: 10px;
+                        top: 10px;
+                        cursor: pointer;
+                }
 
-                    &:last-of-type {
-                        color: #909399;
-                        font-size: 13px;
+                .member-item-info {
+                    flex: 1;
+                    position: relative;
+
+                    .member-item-info-name, .member-item-info-id {
+                        display: flex;
+                        justify-content: space-between;
+
+                        :deep(.el-form-item) {
+                            margin-bottom: 0px !important;
+                        }
+                        :deep(.el-input) {
+                            height:18px;
+                            width: 116px;
+                        }
+                    }
+                    span {
+                        color: #606266;
+                        
+                        &:first-of-type {
+                            margin-right: 8px;
+                            font-weight: 500;
+                        }
+
+                        &:last-of-type {
+                            color: #909399;
+                            font-size: 13px;
+                        }
                     }
                 }
             }
