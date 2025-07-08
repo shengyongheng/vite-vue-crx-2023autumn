@@ -1,6 +1,8 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue';
 
+const BASE_URL = 'https://stunning-gingersnap-0eb308.netlify.app/'
+
 const OPERATE_TYPE = {
     NAME: 'name',
     ID: 'id',
@@ -36,33 +38,89 @@ const rules = reactive({
 })
 
 onMounted(() => {
-    fetch('https://tranquil-toffee-ab3d84.netlify.app/api/members')
+    fetchMembers()
+})
+
+const fetchMembers = () => {
+    fetch(`${BASE_URL}/api/members`)
         .then(response => response.json())
         .then(json => {
             memberList.value = json
         })
         .catch(err => console.log('Request Failed', err));
-})
-
-const handleEditName = (id) => {
-    operateType.value = OPERATE_TYPE.NAME
-    editingIndex.value = id
 }
 
-const handleEditNameCancel = (id) => {
+const handleAddMember = () => {
+    fetch(`${BASE_URL}/api/members?name=${addMemberForm.name}&id=${addMemberForm.id}`, {
+        method: 'POST'
+    })
+        .then(response => response.json())
+        .then(() => {
+            fetchMembers()
+        })
+        .catch(err => console.log('Request Failed', err))
+        .finally(() => {
+            addMemberForm.name = ""
+            addMemberForm.id = ""
+        });
+}
+
+const handleEditName = (id, name) => {
+    operateType.value = OPERATE_TYPE.NAME
+    editingIndex.value = id
+    ruleForm.name = name
+}
+
+const handleEditNameCancel = () => {
     operateType.value = ""
     editingIndex.value = ""
+    ruleForm.name = ""
 }
 
 const handleEditNameSave = (id) => {
-    operateType.value = ""
-    editingIndex.value = ""
-    ruleForm.name = memberList.value.find(item => item.id === id).name
+    fetch(`${BASE_URL}/api/members/${id}?name=${ruleForm.name}&id=${ruleForm.id}`, {
+        method: 'PUT'
+    })
+        .then(() => {
+            fetchMembers()
+        })
+        .catch(err => console.log('Request Failed', err))
+        .finally(() => {
+            operateType.value = ""
+            editingIndex.value = ""
+            ruleForm.name = ""
+        });
 }
 
 const handleEditId = (id) => {
     operateType.value = OPERATE_TYPE.ID
-    editingIndexById.value = id
+    editingIndex.value = id
+    ruleForm.id = id
+}
+
+const handleEditIdCancel = () => {
+    operateType.value = ""
+    editingIndex.value = ""
+    ruleForm.id = ""
+}
+
+const handleEditIdSave = (id) => {
+    operateType.value = ""
+    editingIndex.value = ""
+    ruleForm.id = ""
+}
+
+const handleDeleteMember = (id) => {
+    fetch(`${BASE_URL}/api/members/${id}`, {
+        method: 'DELETE'
+    })
+        .then(() => {
+            fetchMembers()
+        })
+}
+
+const handleConfirm = () => {
+    console.log("开始配置")
 }
 
 const handleSizeChange = (val) => {
@@ -96,14 +154,14 @@ const handleCurrentChange = (val) => {
                     <el-input v-model="addMemberForm.name" placeholder="请输入name" clearable />
                 </el-form-item>
                 <el-form-item>
-                    <el-button type="primary">添加</el-button>
+                    <el-button type="primary" @click="handleAddMember">添加</el-button>
                 </el-form-item>
             </el-form>
         </div>
         <div class="member-container">
             <div class="member-list">
                 <div class="member-item" v-for="item in memberList" :key="item.id">
-                    <el-popconfirm title="确认要删除该成员吗？" placement="top">
+                    <el-popconfirm title="确认要删除该成员吗？" placement="top" @confirm="handleDeleteMember(item.id)">
                         <template #reference>
                             <el-icon class="delete-icon">
                                 <Delete />
@@ -129,7 +187,7 @@ const handleCurrentChange = (val) => {
                                 </template>
                                 <template v-else>
                                     <span>{{ item.name }}</span>
-                                    <el-icon @click="handleEditName(item.id)">
+                                    <el-icon @click="handleEditName(item.id, item.name)">
                                         <Edit />
                                     </el-icon>
                                 </template>
@@ -139,16 +197,16 @@ const handleCurrentChange = (val) => {
                                     <el-form-item prop="id">
                                         <el-input v-model="ruleForm.id" />
                                     </el-form-item>
-                                    <el-icon @click="handleEditSave(item.id)">
+                                    <el-icon @click="handleEditIdCancel(item.id)">
                                         <Close />
                                     </el-icon>
-                                    <el-icon>
+                                    <el-icon @click="handleEditIdSave(item.id)">
                                         <Check />
                                     </el-icon>
                                 </template>
                                 <template v-else>
                                     <span>({{ item.id }})</span>
-                                    <el-icon @click="handleEdit(item.id)">
+                                    <el-icon @click="handleEditId(item.id)">
                                         <Edit />
                                     </el-icon>
                                 </template>
@@ -159,13 +217,13 @@ const handleCurrentChange = (val) => {
             </div>
         </div>
         <div class="footer">
+            <el-button type="primary" style="margin-right: 16px;" @click="handleConfirm">开始配置</el-button>
             <div class="pagination">
                 <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize"
                     :page-sizes="[10, 20, 30, 40]" :size="size" :disabled="disabled" :background="background"
                     layout="total, sizes, prev, pager, next, jumper" :total="memberList.length"
                     @size-change="handleSizeChange" @current-change="handleCurrentChange" />
             </div>
-            <el-button type="primary">确认选择</el-button>
         </div>
     </div>
 </template>
@@ -264,8 +322,8 @@ const handleCurrentChange = (val) => {
                 .delete-icon {
                         position: absolute;
                         display: none;
-                        right: 10px;
-                        top: 10px;
+                        right: -4px;
+                        top: -4px;
                         cursor: pointer;
                 }
 
@@ -305,6 +363,7 @@ const handleCurrentChange = (val) => {
 
     .footer {
         display: flex;
+        overflow-y: auto;
         justify-content: space-between;
         align-items: center;
         padding: 16px 0;
