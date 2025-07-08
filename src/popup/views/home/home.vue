@@ -20,6 +20,8 @@ const disabled = ref(false)
 const editingIndex = ref("")
 
 const memberList = ref([])
+const selectedMembers = ref([])
+
 const ruleFormRef = ref()
 
 const ruleForm = reactive({
@@ -119,8 +121,88 @@ const handleDeleteMember = (id) => {
         })
 }
 
-const handleConfirm = () => {
+const handleConfirm = async () => {
     console.log("开始配置")
+    try {
+        // 获取当前活动标签页
+        const [tab] = await chrome.tabs.query({
+            active: true,
+            currentWindow: true,
+        });
+        const { url } = tab;
+        console.log("url:", url);
+        // 处理每个选中的成员
+        for (const member of selectedMembers.value) {
+            try {
+                handleMember(member, url)
+                console.log("处理成功:", member.nickName, member.mijiaId);
+            } catch (error) {
+                console.error("处理失败:", member.nickName, error);
+                throw error;
+            }
+        }
+    }
+    catch (err) {
+        // 处理失败
+        console.error("处理失败:", error);
+    }
+}
+
+// 处理单个成员
+async function handleMember(member, url) {
+    // console.log("url:", url); // 浏览器地址栏 url
+    const platform = url.includes("extension") ? "0" : url.includes("extension") ? "1" : null;  // 插件 0；固件 1 
+    // console.log("platform:", platform);
+    const rcDialogTitle0 = document.querySelector(`[aria-labelledby="rcDialogTitle${platform}"`); // 插件 rcDialogTitle0；固件 rcDialogTitle1
+    if (rcDialogTitle0?.style?.display === "none") {
+        alert('找不到企业测试成员配置弹窗，请打开需要配置的版本的弹窗后重试！');
+        return;
+    }
+    const targetTestMembers = document.getElementById("targetTestMembers");
+    if (!targetTestMembers) {
+        alert('找不到企业测试成员配置弹窗，请打开需要配置的版本的弹窗后重试！');
+        return;
+    }
+
+    // 模拟输入
+    simulateReactInput(targetTestMembers, member.mijiaId);
+    await sleep(1500);
+
+    const currentId = document.getElementsByClassName("ant5-select-item-option-active")[0];
+
+    if (currentId.getAttribute('aria-selected') !== "true") {
+        if (!currentId) {
+            throw new Error("找不到下拉选项");
+        }
+
+        currentId.click();
+        await sleep(1500);
+
+        console.log("处理 ID:", member.nickName, member.mijiaId);
+    } else {
+        simulateReactInput(targetTestMembers, "");
+    }
+}
+
+// 模拟React输入
+function simulateReactInput(element, value) {
+    const lastValue = element.value;
+    element.value = value;
+
+    if (element._valueTracker) {
+        element._valueTracker.setValue(lastValue);
+    }
+
+    element.dispatchEvent(new InputEvent('input', {
+        bubbles: true,
+        inputType: 'insertText',
+        data: value
+    }));
+}
+
+// 延时函数
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 const handleSizeChange = (val) => {
@@ -290,7 +372,6 @@ const handleCurrentChange = (val) => {
         background: #fff;
         border-radius: 4px;
         margin-bottom: 20px;
-        min-height: 400px;
 
         .member-list {
             display: grid;
