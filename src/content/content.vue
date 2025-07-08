@@ -1,5 +1,5 @@
 <script setup>
-import {ref} from 'vue'
+import { ref } from 'vue'
 import MainDialog from '@/content/components/mainDialog/mainDialog.vue'
 
 // 对话框显示状态
@@ -9,13 +9,13 @@ const isShowMainDialog = ref(false)
 
 <template>
     <el-config-provider namespace="CRX-el">
-        <div class="CRX-content">
+        <!-- <div class="CRX-content">
             <div class="content-entry" @click="isShowMainDialog = true"></div>
             <MainDialog
                 :visible="isShowMainDialog"
                 @onClose="() => {isShowMainDialog = false}"
             />
-        </div>
+        </div> -->
     </el-config-provider>
 </template>
 

@@ -1,10 +1,8 @@
 <script setup>
-import Nav from '@/popup/components/nav/nav.vue'
 </script>
 
 <template>
     <div class="M-entry">
-        <Nav />
         <router-view />
     </div>
 </template>

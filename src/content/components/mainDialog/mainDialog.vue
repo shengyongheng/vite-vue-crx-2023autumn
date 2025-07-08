@@ -1,6 +1,6 @@
 <script setup>
-import { ref, computed } from 'vue'
-import { apiReqs } from '@/api'
+import { apiReqs } from '@/api';
+import { computed, ref } from 'vue';
 // 接受父组件传递的方法
 const emit = defineEmits(['onClose'])
 // 接收父组件传递的参数
@@ -38,12 +38,7 @@ const submit = () => {
 </script>
 
 <template>
-    <el-dialog
-        v-model="isVisible"
-        v-if="isVisible"
-        title="CRX对话框"
-        width="600"
-    >
+    <el-dialog v-model="isVisible" v-if="isVisible" title="CRX对话框" width="600">
         <div class="main-content-con">
             <div class="item-con">
                 <el-input v-model="text" placeholder="" />
