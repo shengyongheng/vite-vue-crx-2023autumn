@@ -1,5 +1,6 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue';
+import { onMounted, reactive, ref, watch } from 'vue';
+import { ElMessage } from 'element-plus';
 
 const BASE_URL = 'https://stunning-gingersnap-0eb308.netlify.app/'
 
@@ -8,19 +9,24 @@ const OPERATE_TYPE = {
     ID: 'id',
 }
 
+const MAX_SELECT_COUNT = 20
+
 const operateType = ref("")
 
 const input = ref('')
 const currentPage = ref(1)
-const pageSize = ref(10)
-
-const size = ref('default')
-const background = ref(false)
-const disabled = ref(false)
+const currentPageMemberList = ref([])
 const editingIndex = ref("")
 
 const memberList = ref([])
-const selectedMembers = ref([])
+
+watch([memberList, currentPage], ([memberListNew, currentPageNew]) => {
+    currentPageMemberList.value = memberListNew.slice((currentPageNew - 1) * 10, currentPageNew * 10)
+}, {
+    deep: true,
+})
+
+const selectedMemberIds = ref([])
 
 const ruleFormRef = ref()
 
@@ -43,11 +49,38 @@ onMounted(() => {
     fetchMembers()
 })
 
+const handleSelectCurrentPage = () => {
+    const isAllChecked = currentPageMemberList.value.every(item => item.checked)
+    const currentPageMemberIds = currentPageMemberList.value.map(item => item.id)
+    if (isAllChecked) {
+        currentPageMemberIds.forEach(id => {
+            memberList.value.find(item => item.id === id).checked = false
+        })
+    } else {
+        const checkedMemberIds = memberList.value.filter(item => item.checked).map(item => item.id)
+        const unCheckedCurrentPageMemberIds = currentPageMemberIds.filter(id => !checkedMemberIds.includes(id))
+        console.log("checkedMemberIds:", checkedMemberIds.length);
+        console.log("unCheckedCurrentPageMemberIds:", unCheckedCurrentPageMemberIds.length);
+        if (checkedMemberIds.length + unCheckedCurrentPageMemberIds.length > MAX_SELECT_COUNT) {
+            openMessage()
+            return
+        }
+        currentPageMemberIds.forEach(id => {
+            memberList.value.find(item => item.id === id).checked = true
+        })
+    }
+    selectedMemberIds.value = memberList.value.filter(item => item.checked).map(item => item.id)
+}
+
+//#region 
 const fetchMembers = () => {
     fetch(`${BASE_URL}/api/members`)
         .then(response => response.json())
         .then(json => {
-            memberList.value = json
+            memberList.value = json.map(item => ({
+                ...item,
+                checked: selectedMemberIds.value.includes(item.id)
+            }))
         })
         .catch(err => console.log('Request Failed', err));
 }
@@ -110,6 +143,12 @@ const handleEditIdSave = (id) => {
     operateType.value = ""
     editingIndex.value = ""
     ruleForm.id = ""
+    selectedMemberIds.value = memberList.value.filter(item => item.checked).map(item => item.id)
+    fetchMembers()
+}
+
+const handleMemberChange = (id) => {
+    selectedMemberIds.value.push(id)
 }
 
 const handleDeleteMember = (id) => {
@@ -122,7 +161,14 @@ const handleDeleteMember = (id) => {
 }
 
 const handleConfirm = async () => {
-    console.log("开始配置")
+    if (selectedMemberIds.value.length === 0) {
+        ElMessage({
+            message: `请先选择要配置的成员`,
+            type: 'info',
+            plain: true,
+        })
+        return
+    }
     try {
         // 获取当前活动标签页
         const [tab] = await chrome.tabs.query({
@@ -131,85 +177,128 @@ const handleConfirm = async () => {
         });
         const { url } = tab;
         console.log("url:", url);
+        // 确保content script已注入
+        await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            files: ["content-script.js"],
+        });
         // 处理每个选中的成员
-        for (const member of selectedMembers.value) {
+        for (const member of memberList.value) {
+            if (!member.checked) continue;
             try {
-                handleMember(member, url)
-                console.log("处理成功:", member.nickName, member.mijiaId);
+                // 发送消息到content script
+                const response = await chrome.tabs.sendMessage(tab.id, {
+                    action: "processMember",
+                    member: member,
+                    url: url,
+                });
+
+                if (!response || !response.success) {
+                    throw new Error(response?.error || "处理失败");
+                }
             } catch (error) {
-                console.error("处理失败:", member.nickName, error);
+                ElMessage({
+                    message: `处理失败: ${member.name} ${member.id}`,
+                    type: 'error',
+                    plain: true,
+                })
                 throw error;
             }
         }
     }
     catch (err) {
-        // 处理失败
-        console.error("处理失败:", error);
+        ElMessage({
+            message: `处理失败: ${err}`,
+            type: 'error',
+            plain: true,
+        })
     }
 }
 
-// 处理单个成员
-async function handleMember(member, url) {
-    // console.log("url:", url); // 浏览器地址栏 url
-    const platform = url.includes("extension") ? "0" : url.includes("extension") ? "1" : null;  // 插件 0；固件 1 
-    // console.log("platform:", platform);
-    const rcDialogTitle0 = document.querySelector(`[aria-labelledby="rcDialogTitle${platform}"`); // 插件 rcDialogTitle0；固件 rcDialogTitle1
-    if (rcDialogTitle0?.style?.display === "none") {
-        alert('找不到企业测试成员配置弹窗，请打开需要配置的版本的弹窗后重试！');
-        return;
-    }
-    const targetTestMembers = document.getElementById("targetTestMembers");
-    if (!targetTestMembers) {
-        alert('找不到企业测试成员配置弹窗，请打开需要配置的版本的弹窗后重试！');
-        return;
-    }
+// // 处理单个成员
+// const handleMember = async (member, url) => {
+//     // console.log("url:", url); // 浏览器地址栏 url
+//     const platform = url.includes("extension") ? "0" : url.includes("extension") ? "1" : null;  // 插件 0；固件 1 
+//     // console.log("platform:", platform);
+//     const rcDialogTitle0 = document.querySelector(`[aria-labelledby="rcDialogTitle${platform}"`); // 插件 rcDialogTitle0；固件 rcDialogTitle1
+//     console.log("rcDialogTitle0:", rcDialogTitle0);
+//     if (rcDialogTitle0?.style?.display === "none") {
+//         ElMessage({
+//             message: `找不到企业测试成员配置弹窗，请打开需要配置的版本的弹窗后重试！11`,
+//             type: 'error',
+//             plain: true,
+//         })
+//         return;
+//     }
+//     const targetTestMembers = document.getElementById("targetTestMembers");
+//     console.log("targetTestMembers:", targetTestMembers);
+//     if (!targetTestMembers) {
+//         ElMessage({
+//             message: `找不到企业测试成员配置弹窗，请打开需要配置的版本的弹窗后重试！22`,
+//             type: 'error',
+//             plain: true,
+//         })
+//         return;
+//     }
 
-    // 模拟输入
-    simulateReactInput(targetTestMembers, member.mijiaId);
-    await sleep(1500);
+//     // 模拟输入
+//     simulateReactInput(targetTestMembers, member.id);
+//     await sleep(1500);
 
-    const currentId = document.getElementsByClassName("ant5-select-item-option-active")[0];
+//     const currentId = document.getElementsByClassName("ant5-select-item-option-active")[0];
 
-    if (currentId.getAttribute('aria-selected') !== "true") {
-        if (!currentId) {
-            throw new Error("找不到下拉选项");
-        }
+//     if (currentId.getAttribute('aria-selected') !== "true") {
+//         if (!currentId) {
+//             throw new Error("找不到下拉选项");
+//         }
 
-        currentId.click();
-        await sleep(1500);
+//         currentId.click();
+//         await sleep(1500);
 
-        console.log("处理 ID:", member.nickName, member.mijiaId);
-    } else {
-        simulateReactInput(targetTestMembers, "");
-    }
+//         console.log("处理 ID:", member.name, member.id);
+//     } else {
+//         simulateReactInput(targetTestMembers, "");
+//     }
+// }
+
+// // 模拟React输入
+// const simulateReactInput = (element, value) => {
+//     const lastValue = element.value;
+//     element.value = value;
+
+//     if (element._valueTracker) {
+//         element._valueTracker.setValue(lastValue);
+//     }
+
+//     element.dispatchEvent(new InputEvent('input', {
+//         bubbles: true,
+//         inputType: 'insertText',
+//         data: value
+//     }));
+//     ElMessage({
+//         message: `处理成功: ${member.name} ${member.id}`,
+//         type: 'success',
+//         plain: true,
+//     })
+// }
+
+// // 延时函数
+// const sleep = (ms) => {
+//     return new Promise(resolve => setTimeout(resolve, ms));
+// }
+//#endregion
+const handlePrevPage = () => {
+    currentPage.value--
 }
-
-// 模拟React输入
-function simulateReactInput(element, value) {
-    const lastValue = element.value;
-    element.value = value;
-
-    if (element._valueTracker) {
-        element._valueTracker.setValue(lastValue);
-    }
-
-    element.dispatchEvent(new InputEvent('input', {
-        bubbles: true,
-        inputType: 'insertText',
-        data: value
-    }));
+const handleNextPage = () => {
+    currentPage.value++
 }
-
-// 延时函数
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-const handleSizeChange = (val) => {
-    console.log(`${val} items per page`)
-}
-const handleCurrentChange = (val) => {
-    console.log(`current page: ${val}`)
+const openMessage = () => {
+    ElMessage({
+        message: `最多只能选择 ${MAX_SELECT_COUNT} 个成员`,
+        type: 'warning',
+        plain: true,
+    })
 }
 </script>
 
@@ -217,32 +306,33 @@ const handleCurrentChange = (val) => {
     <div class="P-home">
         <div class="P-home-header">
             <h1>米家自动化配置助手</h1>
-            <el-button>全选当前页</el-button>
+            <el-button @click="handleSelectCurrentPage">全选当前页</el-button>
         </div>
         <el-divider style="margin: 0" />
         <div class="selection-info">
-            <span>已选择：<span class="selection-count">0</span> / 20</span>
-            <span class="selection-limit" style="display: none">最多只能选择 20 个成员</span>
+            <span>已选择：<span class="selection-count">{{ selectedMemberIds.length }}</span> / {{ MAX_SELECT_COUNT
+                }}</span>
+            <span class="selection-limit" style="display: none">最多只能选择 {{ MAX_SELECT_COUNT }} 个成员</span>
         </div>
         <div class="search-box">
             <el-input v-model="input" style="width: 100%;height: 28px;" placeholder="搜索成员..." clearable />
         </div>
         <div class="add-member">
             <el-form :inline="true" :model="addMemberForm" class="demo-form-inline">
-                <el-form-item label="id">
+                <el-form-item label="米家ID:">
                     <el-input v-model="addMemberForm.id" placeholder="请输入id" clearable />
                 </el-form-item>
-                <el-form-item label="name">
+                <el-form-item label="用户名:">
                     <el-input v-model="addMemberForm.name" placeholder="请输入name" clearable />
                 </el-form-item>
-                <el-form-item>
+                <el-form-item style="margin-left: 0px !important;">
                     <el-button type="primary" @click="handleAddMember">添加</el-button>
                 </el-form-item>
             </el-form>
         </div>
         <div class="member-container">
             <div class="member-list">
-                <div class="member-item" v-for="item in memberList" :key="item.id">
+                <div class="member-item" v-for="item in currentPageMemberList" :key="item.id">
                     <el-popconfirm title="确认要删除该成员吗？" placement="top" @confirm="handleDeleteMember(item.id)">
                         <template #reference>
                             <el-icon class="delete-icon">
@@ -250,7 +340,7 @@ const handleCurrentChange = (val) => {
                             </el-icon>
                         </template>
                     </el-popconfirm>
-                    <el-checkbox v-model="item.checked" />
+                    <el-checkbox v-model="item.checked" @change="handleMemberChange(item.id)" />
                     <div class="member-item-info">
                         <el-form ref="ruleFormRef" :model="ruleForm" status-icon :rules="rules" label-width="auto">
                             <div class="member-item-info-name">
@@ -299,26 +389,27 @@ const handleCurrentChange = (val) => {
             </div>
         </div>
         <div class="footer">
-            <el-button type="primary" style="margin-right: 16px;" @click="handleConfirm">开始配置</el-button>
             <div class="pagination">
-                <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize"
-                    :page-sizes="[10, 20, 30, 40]" :size="size" :disabled="disabled" :background="background"
-                    layout="total, sizes, prev, pager, next, jumper" :total="memberList.length"
-                    @size-change="handleSizeChange" @current-change="handleCurrentChange" />
+                <el-button style="margin-right: 8px;" @click="handlePrevPage"
+                    :disabled="currentPage === 1">上一页</el-button>
+                <span>第 {{ currentPage }} 页，共 {{ Math.ceil(memberList.length / 10) }} 页</span>
+                <el-button style="margin-left: 8px;" @click="handleNextPage"
+                    :disabled="currentPage === Math.ceil(memberList.length / 10)">下一页</el-button>
             </div>
+            <el-button type="primary" style="margin-left: 8px;" @click="handleConfirm">开始配置</el-button>
         </div>
     </div>
 </template>
 
 <style scoped lang="less">
 .P-home {
-    padding: 20px;
-
+    padding: 16px;
+    position: relative;
     .P-home-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 16px;
+        margin-bottom: 12px;
 
         h1 {
             font-size: 20px;
@@ -328,7 +419,7 @@ const handleCurrentChange = (val) => {
     }
 
     .selection-info {
-        margin: 16px 0;
+        margin: 12px 0;
         color: #606266;
         font-size: 14px;
 
@@ -344,7 +435,7 @@ const handleCurrentChange = (val) => {
     }
 
     .search-box {
-        margin-bottom: 20px;
+        margin-bottom: 12px;
     }
 
     .add-member {
@@ -371,12 +462,12 @@ const handleCurrentChange = (val) => {
     .member-container {
         background: #fff;
         border-radius: 4px;
-        margin-bottom: 20px;
+        margin-bottom: 16px;
 
         .member-list {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 16px;
+            gap: 10px;
 
             .member-item {
                 position: relative;
@@ -444,15 +535,17 @@ const handleCurrentChange = (val) => {
 
     .footer {
         display: flex;
-        overflow-y: auto;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
         justify-content: space-between;
         align-items: center;
-        padding: 16px 0;
+        padding: 14px 16px 16px 16px;
         border-top: 1px solid #EBEEF5;
 
         .pagination {
             flex: 1;
-            margin-right: 16px;
         }
     }
 }
