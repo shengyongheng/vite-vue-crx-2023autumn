@@ -1,5 +1,3 @@
-import { ElMessage } from "element-plus";
-
 // 监听来自popup的消息
 chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
   if (request.action === "processMember") {
@@ -12,34 +10,34 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
 
 // 处理单个成员
 async function handleMember(member, url) {
-  // console.log("url:", url); // 浏览器地址栏 url
+  console.log("浏览器地址栏 url:", url);
   const platform = url.includes("extension")
     ? "0"
     : url.includes("extension")
     ? "1"
     : null; // 插件 0；固件 1
-  // console.log("platform:", platform);
+
   const rcDialogTitle0 = document.querySelector(
     `[aria-labelledby="rcDialogTitle${platform}"`
   ); // 插件 rcDialogTitle0；固件 rcDialogTitle1
   if (rcDialogTitle0?.style?.display === "none") {
-    ElMessage({
-      message: `找不到企业测试成员配置弹窗，请打开需要配置的版本的弹窗后重试！11`,
-      type: "error",
-      plain: true,
-    });
-  }
-  const targetTestMembers = document.getElementById("targetTestMembers");
-  if (!targetTestMembers) {
-    ElMessage({
-      message: `找不到企业测试成员配置弹窗，请打开需要配置的版本的弹窗后重试！22`,
-      type: "error",
-      plain: true,
-    });
+    throw new Error(
+      "找不到企业测试成员配置弹窗，请打开需要配置的版本的弹窗后重试！"
+    );
   }
 
+  const targetTestMembers = document.getElementById("targetTestMembers");
+  if (!targetTestMembers) {
+    throw new Error(
+      "找不到企业测试成员配置弹窗，请打开需要配置的版本的弹窗后重试！"
+    );
+  }
+
+  console.log("rcDialogTitle0:", rcDialogTitle0);
+  console.log("targetTestMembers:", targetTestMembers);
+
   // 模拟输入
-  simulateReactInput(targetTestMembers, member.mijiaId);
+  simulateReactInput(targetTestMembers, member.id);
   await sleep(1500);
 
   const currentId = document.getElementsByClassName(
@@ -54,7 +52,7 @@ async function handleMember(member, url) {
     currentId.click();
     await sleep(1500);
 
-    console.log("处理 ID:", member.nickName, member.mijiaId);
+    console.log("处理 ID:", member.name, member.id);
   } else {
     simulateReactInput(targetTestMembers, "");
   }

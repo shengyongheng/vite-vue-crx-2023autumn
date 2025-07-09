@@ -1,7 +1,6 @@
 <script setup>
-import { onMounted, reactive, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
-
+import { onMounted, reactive, ref, watch } from 'vue';
 const BASE_URL = 'https://stunning-gingersnap-0eb308.netlify.app/'
 
 const OPERATE_TYPE = {
@@ -176,11 +175,10 @@ const handleConfirm = async () => {
             currentWindow: true,
         });
         const { url } = tab;
-        console.log("url:", url);
         // 确保content script已注入
         await chrome.scripting.executeScript({
             target: { tabId: tab.id },
-            files: ["content-script.js"],
+            files: ["content.js", "content-script.js"],
         });
         // 处理每个选中的成员
         for (const member of memberList.value) {
@@ -208,7 +206,7 @@ const handleConfirm = async () => {
     }
     catch (err) {
         ElMessage({
-            message: `处理失败: ${err}`,
+            message: `处理失败: ${err}`, // Could not establish connection. Receiving end does not exist.
             type: 'error',
             plain: true,
         })
