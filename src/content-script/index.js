@@ -10,7 +10,6 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
 
 // 处理单个成员
 async function handleMember(member, url) {
-  console.log("浏览器地址栏 url:", url);
   const platform = url.includes("extension")
     ? "0"
     : url.includes("extension")
@@ -21,21 +20,13 @@ async function handleMember(member, url) {
     `[aria-labelledby="rcDialogTitle${platform}"`
   ); // 插件 rcDialogTitle0；固件 rcDialogTitle1
   if (rcDialogTitle0?.style?.display === "none") {
-    throw new Error(
-      "找不到企业测试成员配置弹窗，请打开需要配置的版本的弹窗后重试！"
-    );
+    alert("找不到企业测试成员配置弹窗，请打开需要配置的版本的弹窗后重试！");
   }
 
   const targetTestMembers = document.getElementById("targetTestMembers");
   if (!targetTestMembers) {
-    throw new Error(
-      "找不到企业测试成员配置弹窗，请打开需要配置的版本的弹窗后重试！"
-    );
+    alert("找不到企业测试成员配置弹窗，请打开需要配置的版本的弹窗后重试！");
   }
-
-  console.log("rcDialogTitle0:", rcDialogTitle0);
-  console.log("targetTestMembers:", targetTestMembers);
-
   // 模拟输入
   simulateReactInput(targetTestMembers, member.id);
   await sleep(1500);

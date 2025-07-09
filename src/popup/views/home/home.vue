@@ -58,8 +58,6 @@ const handleSelectCurrentPage = () => {
     } else {
         const checkedMemberIds = memberList.value.filter(item => item.checked).map(item => item.id)
         const unCheckedCurrentPageMemberIds = currentPageMemberIds.filter(id => !checkedMemberIds.includes(id))
-        console.log("checkedMemberIds:", checkedMemberIds.length);
-        console.log("unCheckedCurrentPageMemberIds:", unCheckedCurrentPageMemberIds.length);
         if (checkedMemberIds.length + unCheckedCurrentPageMemberIds.length > MAX_SELECT_COUNT) {
             openMessage()
             return
@@ -103,12 +101,14 @@ const handleEditName = (id, name) => {
     operateType.value = OPERATE_TYPE.NAME
     editingIndex.value = id
     ruleForm.name = name
+    ruleForm.id = id
 }
 
 const handleEditNameCancel = () => {
     operateType.value = ""
     editingIndex.value = ""
     ruleForm.name = ""
+    ruleForm.id = ""
 }
 
 const handleEditNameSave = (id) => {
@@ -123,27 +123,39 @@ const handleEditNameSave = (id) => {
             operateType.value = ""
             editingIndex.value = ""
             ruleForm.name = ""
+            ruleForm.id = ""
         });
 }
 
-const handleEditId = (id) => {
+const handleEditId = (id, name) => {
     operateType.value = OPERATE_TYPE.ID
     editingIndex.value = id
     ruleForm.id = id
+    ruleForm.name = name
 }
 
 const handleEditIdCancel = () => {
     operateType.value = ""
     editingIndex.value = ""
     ruleForm.id = ""
+    ruleForm.name = ""
 }
 
 const handleEditIdSave = (id) => {
-    operateType.value = ""
-    editingIndex.value = ""
-    ruleForm.id = ""
-    selectedMemberIds.value = memberList.value.filter(item => item.checked).map(item => item.id)
-    fetchMembers()
+    fetch(`${BASE_URL}/api/members/${id}?name=${ruleForm.name}&id=${ruleForm.id}`, {
+        method: 'PUT'
+    })
+        .then(() => {
+            fetchMembers()
+        })
+        .catch(err => console.log('Request Failed', err))
+        .finally(() => {
+            operateType.value = ""
+            editingIndex.value = ""
+            ruleForm.name = ""
+            ruleForm.id = ""
+            selectedMemberIds.value = memberList.value.filter(item => item.checked).map(item => item.id)
+        });
 }
 
 const handleMemberChange = (id) => {
@@ -376,7 +388,7 @@ const openMessage = () => {
                                 </template>
                                 <template v-else>
                                     <span>({{ item.id }})</span>
-                                    <el-icon @click="handleEditId(item.id)">
+                                    <el-icon @click="handleEditId(item.id, item.name)">
                                         <Edit />
                                     </el-icon>
                                 </template>
