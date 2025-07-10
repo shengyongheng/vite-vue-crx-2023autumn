@@ -436,8 +436,9 @@ const searchTypeChange = (value) => {
                     memberList.length) /
                     10), 1) }}
                     页</span>
-                <el-button style="margin-left: 8px;" @click="handleNextPage"
-                    :disabled="currentPage === Math.ceil((!!input ? searchMemberList.length : memberList.length) / 10)">下一页</el-button>
+                <el-button style="margin-left: 8px;" @click="handleNextPage" :disabled="currentPage === Math.max(Math.ceil((!!input ? searchMemberList.length :
+                    memberList.length) /
+                    10), 1)">下一页</el-button>
             </div>
             <el-button type="primary" style="margin-left: 8px;" @click="handleConfirm">开始配置</el-button>
         </div>
