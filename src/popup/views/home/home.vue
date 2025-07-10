@@ -1,6 +1,7 @@
 <script setup>
 import { ElMessage } from 'element-plus';
 import { onMounted, reactive, ref, watch } from 'vue';
+
 const BASE_URL = 'https://stunning-gingersnap-0eb308.netlify.app/'
 
 const OPERATE_TYPE = {
@@ -13,21 +14,39 @@ const MAX_SELECT_COUNT = 20
 const operateType = ref("")
 
 const input = ref('')
+const searchType = ref('0') // 0 按name搜索 1 按id搜索
 const currentPage = ref(1)
 const currentPageMemberList = ref([])
+const searchMemberList = ref([])
 const editingIndex = ref("")
+const updatedLoading = ref(false)
 
 const memberList = ref([])
 
-watch([memberList, currentPage], ([memberListNew, currentPageNew]) => {
-    currentPageMemberList.value = memberListNew.slice((currentPageNew - 1) * 10, currentPageNew * 10)
+watch([memberList, searchMemberList, currentPage, input], ([memberListNew, searchMemberListNew, currentPageNew, inputNew]) => {
+    if (!inputNew) {
+        currentPageMemberList.value = memberListNew.slice((currentPageNew - 1) * 10, currentPageNew * 10)
+    } else {
+        currentPageMemberList.value = searchMemberListNew.slice((currentPageNew - 1) * 10, currentPageNew * 10)
+    }
 }, {
     deep: true,
 })
 
+//#region 
+watch(updatedLoading, (newVal) => {
+    if (!newVal) {
+        operateType.value = ""
+        editingIndex.value = ""
+        ruleForm.name = ""
+        ruleForm.id = ""
+    }
+})
+
 const selectedMemberIds = ref([])
 
-const ruleFormRef = ref()
+const ruleFormRef = ref([])
+const addMemberFormRef = ref()
 
 const ruleForm = reactive({
     name: '',
@@ -39,9 +58,25 @@ const addMemberForm = reactive({
     id: '',
 })
 
+const validateId = (_, value, callback) => {
+    if (value === '') {
+        callback(new Error('请输入ID'))
+    } else {
+        if (isNaN(value)) {
+            callback(new Error('ID 只允许输入数字'))
+        }
+        callback()
+    }
+}
+
 const rules = reactive({
     name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
-    id: [{ required: true, message: '请输入ID', trigger: 'blur' }],
+    id: [{ required: true, trigger: 'blur', validator: validateId }],
+})
+
+const addMemberRules = reactive({
+    name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
+    id: [{ required: true, trigger: 'blur', validator: validateId }],
 })
 
 onMounted(() => {
@@ -69,7 +104,6 @@ const handleSelectCurrentPage = () => {
     selectedMemberIds.value = memberList.value.filter(item => item.checked).map(item => item.id)
 }
 
-//#region 
 const fetchMembers = () => {
     fetch(`${BASE_URL}/api/members`)
         .then(response => response.json())
@@ -78,23 +112,31 @@ const fetchMembers = () => {
                 ...item,
                 checked: selectedMemberIds.value.includes(item.id)
             }))
+            if (!!input.value) {
+                handleSearch()
+            }
+            updatedLoading.value = false
         })
         .catch(err => console.log('Request Failed', err));
 }
 
-const handleAddMember = () => {
-    fetch(`${BASE_URL}/api/members?name=${addMemberForm.name}&id=${addMemberForm.id}`, {
-        method: 'POST'
-    })
-        .then(response => response.json())
-        .then(() => {
-            fetchMembers()
+const handleAddMember = async () => {
+    if (!addMemberFormRef.value) return
+    try {
+        await addMemberFormRef.value.validate()
+        fetch(`${BASE_URL}/api/members?name=${addMemberForm.name}&id=${addMemberForm.id}`, {
+            method: 'POST'
         })
-        .catch(err => console.log('Request Failed', err))
-        .finally(() => {
-            addMemberForm.name = ""
-            addMemberForm.id = ""
-        });
+            .then(response => response.json())
+            .then(() => {
+                fetchMembers()
+                addMemberForm.name = ""
+                addMemberForm.id = ""
+            })
+            .catch(err => console.log('Request Failed', err))
+    } catch (error) {
+        console.log('表单验证失败', error)
+    }
 }
 
 const handleEditName = (id, name) => {
@@ -111,20 +153,22 @@ const handleEditNameCancel = () => {
     ruleForm.id = ""
 }
 
-const handleEditNameSave = (id) => {
-    fetch(`${BASE_URL}/api/members/${id}?name=${ruleForm.name}&id=${ruleForm.id}`, {
-        method: 'PUT'
-    })
-        .then(() => {
-            fetchMembers()
+const handleEditNameSave = async (id, index) => {
+    if (!ruleFormRef.value[index]) return
+    try {
+        await ruleFormRef.value[index].validate()
+        updatedLoading.value = true
+        fetch(`${BASE_URL}/api/members/${id}?name=${ruleForm.name}&id=${ruleForm.id}`, {
+            method: 'PUT'
         })
-        .catch(err => console.log('Request Failed', err))
-        .finally(() => {
-            operateType.value = ""
-            editingIndex.value = ""
-            ruleForm.name = ""
-            ruleForm.id = ""
-        });
+            .then(() => {
+                fetchMembers()
+            })
+            .catch(err => console.log('Request Failed', err))
+            .finally(() => { })
+    } catch (error) {
+        console.log('表单验证失败', error)
+    }
 }
 
 const handleEditId = (id, name) => {
@@ -141,25 +185,31 @@ const handleEditIdCancel = () => {
     ruleForm.name = ""
 }
 
-const handleEditIdSave = (id) => {
-    fetch(`${BASE_URL}/api/members/${id}?name=${ruleForm.name}&id=${ruleForm.id}`, {
-        method: 'PUT'
-    })
-        .then(() => {
-            fetchMembers()
+const handleEditIdSave = async (id, index) => {
+    if (!ruleFormRef.value[index]) return
+    try {
+        await ruleFormRef.value[index].validate()
+        updatedLoading.value = true
+        fetch(`${BASE_URL}/api/members/${id}?name=${ruleForm.name}&id=${ruleForm.id}`, {
+            method: 'PUT'
         })
-        .catch(err => console.log('Request Failed', err))
-        .finally(() => {
-            operateType.value = ""
-            editingIndex.value = ""
-            ruleForm.name = ""
-            ruleForm.id = ""
-            selectedMemberIds.value = memberList.value.filter(item => item.checked).map(item => item.id)
-        });
+            .then(() => {
+                fetchMembers()
+                selectedMemberIds.value = memberList.value.filter(item => item.checked).map(item => item.id)
+            })
+            .catch(err => console.log('Request Failed', err))
+            .finally(() => { })
+    } catch (error) {
+        console.log('表单验证失败', error)
+    }
 }
 
 const handleMemberChange = (id) => {
-    selectedMemberIds.value.push(id)
+    if (selectedMemberIds.value.includes(id)) {
+        selectedMemberIds.value = selectedMemberIds.value.filter(item => item !== id)
+    } else {
+        selectedMemberIds.value.push(id)
+    }
 }
 
 const handleDeleteMember = (id) => {
@@ -218,85 +268,12 @@ const handleConfirm = async () => {
     }
     catch (err) {
         ElMessage({
-            message: `处理失败: ${err}`, // Could not establish connection. Receiving end does not exist.
+            message: `处理失败: ${err}`,
             type: 'error',
             plain: true,
         })
     }
 }
-
-// // 处理单个成员
-// const handleMember = async (member, url) => {
-//     // console.log("url:", url); // 浏览器地址栏 url
-//     const platform = url.includes("extension") ? "0" : url.includes("extension") ? "1" : null;  // 插件 0；固件 1 
-//     // console.log("platform:", platform);
-//     const rcDialogTitle0 = document.querySelector(`[aria-labelledby="rcDialogTitle${platform}"`); // 插件 rcDialogTitle0；固件 rcDialogTitle1
-//     console.log("rcDialogTitle0:", rcDialogTitle0);
-//     if (rcDialogTitle0?.style?.display === "none") {
-//         ElMessage({
-//             message: `找不到企业测试成员配置弹窗，请打开需要配置的版本的弹窗后重试！11`,
-//             type: 'error',
-//             plain: true,
-//         })
-//         return;
-//     }
-//     const targetTestMembers = document.getElementById("targetTestMembers");
-//     console.log("targetTestMembers:", targetTestMembers);
-//     if (!targetTestMembers) {
-//         ElMessage({
-//             message: `找不到企业测试成员配置弹窗，请打开需要配置的版本的弹窗后重试！22`,
-//             type: 'error',
-//             plain: true,
-//         })
-//         return;
-//     }
-
-//     // 模拟输入
-//     simulateReactInput(targetTestMembers, member.id);
-//     await sleep(1500);
-
-//     const currentId = document.getElementsByClassName("ant5-select-item-option-active")[0];
-
-//     if (currentId.getAttribute('aria-selected') !== "true") {
-//         if (!currentId) {
-//             throw new Error("找不到下拉选项");
-//         }
-
-//         currentId.click();
-//         await sleep(1500);
-
-//         console.log("处理 ID:", member.name, member.id);
-//     } else {
-//         simulateReactInput(targetTestMembers, "");
-//     }
-// }
-
-// // 模拟React输入
-// const simulateReactInput = (element, value) => {
-//     const lastValue = element.value;
-//     element.value = value;
-
-//     if (element._valueTracker) {
-//         element._valueTracker.setValue(lastValue);
-//     }
-
-//     element.dispatchEvent(new InputEvent('input', {
-//         bubbles: true,
-//         inputType: 'insertText',
-//         data: value
-//     }));
-//     ElMessage({
-//         message: `处理成功: ${member.name} ${member.id}`,
-//         type: 'success',
-//         plain: true,
-//     })
-// }
-
-// // 延时函数
-// const sleep = (ms) => {
-//     return new Promise(resolve => setTimeout(resolve, ms));
-// }
-//#endregion
 const handlePrevPage = () => {
     currentPage.value--
 }
@@ -310,6 +287,24 @@ const openMessage = () => {
         plain: true,
     })
 }
+//#endregion
+
+const handleSearch = () => {
+    if (searchType.value === "0" && !!input.value.trim()) {
+        searchMemberList.value = memberList.value.filter(item => item.name.includes(input.value.trim()))
+    } else if (searchType.value === "1" && !!input.value.trim()) {
+        searchMemberList.value = memberList.value.filter(item => item.id.includes(input.value.trim()))
+    } else {
+        searchMemberList.value = memberList.value
+    }
+    currentPage.value = 1
+}
+
+const searchTypeChange = (value) => {
+    searchType.value = value
+    handleSearch()
+}
+
 </script>
 
 <template>
@@ -325,14 +320,20 @@ const openMessage = () => {
             <span class="selection-limit" style="display: none">最多只能选择 {{ MAX_SELECT_COUNT }} 个成员</span>
         </div>
         <div class="search-box">
-            <el-input v-model="input" style="width: 100%;height: 28px;" placeholder="搜索成员..." clearable />
+            <el-input v-model="input" style="width: 45%;height: 28px;" placeholder="搜索成员..." clearable
+                @input="handleSearch" @clear="handleSearch" />
+            <el-radio-group v-model="searchType" @change="searchTypeChange">
+                <el-radio label="0">按 name 搜索</el-radio>
+                <el-radio label="1">按 id 搜索</el-radio>
+            </el-radio-group>
         </div>
         <div class="add-member">
-            <el-form :inline="true" :model="addMemberForm" class="demo-form-inline">
-                <el-form-item label="米家ID:">
+            <el-form ref="addMemberFormRef" :inline="true" :model="addMemberForm" :rules="addMemberRules"
+                class="demo-form-inline">
+                <el-form-item label="米家ID:" prop="id">
                     <el-input v-model="addMemberForm.id" placeholder="请输入id" clearable />
                 </el-form-item>
-                <el-form-item label="用户名:">
+                <el-form-item label="成员名:" prop="name">
                     <el-input v-model="addMemberForm.name" placeholder="请输入name" clearable />
                 </el-form-item>
                 <el-form-item style="margin-left: 0px !important;">
@@ -342,7 +343,7 @@ const openMessage = () => {
         </div>
         <div class="member-container">
             <div class="member-list">
-                <div class="member-item" v-for="item in currentPageMemberList" :key="item.id">
+                <div class="member-item" v-for="(item, index) in currentPageMemberList" :key="item.id">
                     <el-popconfirm title="确认要删除该成员吗？" placement="top" @confirm="handleDeleteMember(item.id)">
                         <template #reference>
                             <el-icon class="delete-icon">
@@ -350,11 +351,14 @@ const openMessage = () => {
                             </el-icon>
                         </template>
                     </el-popconfirm>
-                    <el-checkbox v-model="item.checked" @change="handleMemberChange(item.id)" />
+                    <el-checkbox v-model="item.checked" @change="handleMemberChange(item.id)"
+                        :disabled="selectedMemberIds.length >= MAX_SELECT_COUNT && !item.checked" />
                     <div class="member-item-info">
-                        <el-form ref="ruleFormRef" :model="ruleForm" status-icon :rules="rules" label-width="auto">
+                        <el-form :ref="(el) => ruleFormRef[index] = el" :model="ruleForm" status-icon :rules="rules"
+                            label-width="auto">
                             <div class="member-item-info-name">
-                                <template v-if="editingIndex === item.id && operateType === OPERATE_TYPE.NAME">
+                                <template
+                                    v-if="editingIndex === item.id && operateType === OPERATE_TYPE.NAME && !updatedLoading">
                                     <el-form-item prop="name">
                                         <el-input v-model="ruleForm.name" />
                                     </el-form-item>
@@ -362,32 +366,53 @@ const openMessage = () => {
                                         <el-icon @click="handleEditNameCancel(item.name)">
                                             <Close />
                                         </el-icon>
-                                        <el-icon @click="handleEditNameSave(item.id)">
+                                        <el-icon @click="handleEditNameSave(item.id, index)">
                                             <Check />
                                         </el-icon>
                                     </div>
                                 </template>
                                 <template v-else>
-                                    <span>{{ item.name }}</span>
+                                    <template
+                                        v-if="updatedLoading && editingIndex === item.id && operateType === OPERATE_TYPE.NAME">
+                                        <el-icon>
+                                            <Loading />
+                                        </el-icon>
+                                    </template>
+                                    <template v-else>
+                                        <el-tooltip effect="dark" content="成员名" placement="top" :show-after="1000">
+                                            <span>{{ item.name }}</span>
+                                        </el-tooltip>
+                                    </template>
                                     <el-icon @click="handleEditName(item.id, item.name)">
                                         <Edit />
                                     </el-icon>
                                 </template>
                             </div>
                             <div class="member-item-info-id">
-                                <template v-if="editingIndex === item.id && operateType === OPERATE_TYPE.ID">
+                                <template
+                                    v-if="editingIndex === item.id && operateType === OPERATE_TYPE.ID && !updatedLoading">
                                     <el-form-item prop="id">
                                         <el-input v-model="ruleForm.id" />
                                     </el-form-item>
                                     <el-icon @click="handleEditIdCancel(item.id)">
                                         <Close />
                                     </el-icon>
-                                    <el-icon @click="handleEditIdSave(item.id)">
+                                    <el-icon @click="handleEditIdSave(item.id, index)">
                                         <Check />
                                     </el-icon>
                                 </template>
                                 <template v-else>
-                                    <span>({{ item.id }})</span>
+                                    <template
+                                        v-if="updatedLoading && editingIndex === item.id && operateType === OPERATE_TYPE.ID">
+                                        <el-icon>
+                                            <Loading />
+                                        </el-icon>
+                                    </template>
+                                    <template v-else>
+                                        <el-tooltip effect="dark" content="米家 ID" placement="top" :show-after="1000">
+                                            <span>{{ item.id }}</span>
+                                        </el-tooltip>
+                                    </template>
                                     <el-icon @click="handleEditId(item.id, item.name)">
                                         <Edit />
                                     </el-icon>
@@ -402,9 +427,11 @@ const openMessage = () => {
             <div class="pagination">
                 <el-button style="margin-right: 8px;" @click="handlePrevPage"
                     :disabled="currentPage === 1">上一页</el-button>
-                <span>第 {{ currentPage }} 页，共 {{ Math.ceil(memberList.length / 10) }} 页</span>
+                <span>第 {{ currentPage }} 页，共 {{ Math.ceil((!!input ? searchMemberList.length : memberList.length) / 10)
+                    }}
+                    页</span>
                 <el-button style="margin-left: 8px;" @click="handleNextPage"
-                    :disabled="currentPage === Math.ceil(memberList.length / 10)">下一页</el-button>
+                    :disabled="currentPage === Math.ceil((!!input ? searchMemberList.length : memberList.length) / 10)">下一页</el-button>
             </div>
             <el-button type="primary" style="margin-left: 8px;" @click="handleConfirm">开始配置</el-button>
         </div>
@@ -413,7 +440,7 @@ const openMessage = () => {
 
 <style scoped lang="less">
 .P-home {
-    padding: 16px;
+    padding: 12px;
     position: relative;
     .P-home-header {
         display: flex;
@@ -445,7 +472,13 @@ const openMessage = () => {
     }
 
     .search-box {
+        display: flex;
         margin-bottom: 12px;
+        align-items: center;
+        :deep(.el-radio) {
+            margin-left: 12px !important;
+            margin-right: 0px !important;
+        }
     }
 
     .add-member {
@@ -516,6 +549,7 @@ const openMessage = () => {
                     .member-item-info-name, .member-item-info-id {
                         display: flex;
                         justify-content: space-between;
+                        align-items: center;
 
                         :deep(.el-form-item) {
                             margin-bottom: 0px !important;

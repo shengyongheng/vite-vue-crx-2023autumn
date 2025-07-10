@@ -10,7 +10,7 @@
 <style lang="less">
 body {
   position: relative;
-  width: 442px;
+  width: 453px;
   height: 543px;
 }
 </style>

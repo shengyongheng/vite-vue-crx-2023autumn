@@ -1,7 +1,8 @@
 {
-  "name": "Chrome插件V3",
-  "version": "1.0",
-  "description": "基于Vite的chrome插件V3 Demo",
+  "name": "Mijia Configuration Helper",
+  "version": "2.0",
+  "description": "米家自动化配置助手",
+  "author": "shengyongheng",
   "manifest_version": 3,
   "background": {
     "service_worker": "background.js"
@@ -22,7 +23,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["/images/app.png"],
+      "resources": ["/images/Mijia_icon.png"],
       "matches": ["<all_urls>"]
     },
     {
@@ -33,17 +34,17 @@
   "action": {
     "default_popup": "index.html",
     "default_icon": {
-      "16": "/images/app.png",
-      "32": "/images/app.png",
-      "48": "/images/app.png",
-      "128": "/images/app.png"
+      "16": "/images/Mijia_icon.png",
+      "32": "/images/Mijia_icon.png",
+      "48": "/images/Mijia_icon.png",
+      "128": "/images/Mijia_icon.png"
     },
     "default_title": "Vue CRX MV3"
   },
   "icons": {
-    "16": "/images/app.png",
-    "32": "/images/app.png",
-    "48": "/images/app.png",
-    "128": "/images/app.png"
+    "16": "/images/Mijia_icon.png",
+    "32": "/images/Mijia_icon.png",
+    "48": "/images/Mijia_icon.png",
+    "128": "/images/Mijia_icon.png"
   }
 }
