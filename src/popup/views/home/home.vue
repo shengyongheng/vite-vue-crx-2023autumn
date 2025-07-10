@@ -217,6 +217,11 @@ const handleDeleteMember = (id) => {
         method: 'DELETE'
     })
         .then(() => {
+            ElMessage({
+                message: `删除成功`,
+                type: 'success',
+                plain: true,
+            })
             fetchMembers()
         })
 }
