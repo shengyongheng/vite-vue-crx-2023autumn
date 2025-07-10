@@ -491,6 +491,9 @@ const searchTypeChange = (value) => {
         :deep(.el-form-item) {
             margin-bottom: 16px !important;
             margin-right: 8px !important;
+            .el-form-item__label {
+                padding-right: 4px !important;
+            }
         }
         :deep(.el-input) {
             width: 116px;
