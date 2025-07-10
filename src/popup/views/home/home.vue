@@ -432,8 +432,9 @@ const searchTypeChange = (value) => {
             <div class="pagination">
                 <el-button style="margin-right: 8px;" @click="handlePrevPage"
                     :disabled="currentPage === 1">上一页</el-button>
-                <span>第 {{ currentPage }} 页，共 {{ Math.ceil((!!input ? searchMemberList.length : memberList.length) / 10)
-                    }}
+                <span>第 {{ currentPage }} 页，共 {{ Math.max(Math.ceil((!!input ? searchMemberList.length :
+                    memberList.length) /
+                    10), 1) }}
                     页</span>
                 <el-button style="margin-left: 8px;" @click="handleNextPage"
                     :disabled="currentPage === Math.ceil((!!input ? searchMemberList.length : memberList.length) / 10)">下一页</el-button>
